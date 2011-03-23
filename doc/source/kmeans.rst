@@ -29,7 +29,7 @@ To demostrate the K-means algorithm, we will construct a simple example with thr
 
 The second plot of this example will give the clustering result from the algorithm.
 
-.. image:: ../img/kmeans_2d.png
+.. image:: figures/kmeans_2d.png
 
 
 Application Programming Interface
