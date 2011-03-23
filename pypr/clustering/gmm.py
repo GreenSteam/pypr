@@ -1,0 +1,483 @@
+
+"""Gaussian Mixture Models
+"""
+
+import numpy as np
+import numpy.linalg as linalg
+import kmeans
+import copy
+from copy import deepcopy
+
+def mulnormpdf(X, MU, SIGMA):
+    """Evaluates the PDF for the multivariate Guassian distribution.
+
+    Parameters
+    ----------
+    X : np array
+        Inputs/entries row-wise. Can also be a 1-d array if only a 
+        single point is evaluated.
+    MU : nparray
+        Center/mean, 1d array. 
+    SIGMA : 2d np array
+        Covariance matrix.
+
+    Returns
+    -------
+    prob : 1d np array
+        Probabilities for entries in `X`.
+    
+    Examples
+    --------
+    ::
+
+        from pypr.clustering import *
+        from numpy import *
+        X = array([[0,0],[1,1]])
+        MU = array([0,0])
+        SIGMA = diag((1,1))
+        gmm.mulnormpdf(X, MU, SIGMA)
+
+    """
+    # Check if inputs are ok:
+    if MU.ndim != 1:
+        raise ValueError, "MU must be a 1 dimensional array"
+    
+    # Evaluate pdf at points or point:
+    mu = MU
+    x = X.T
+    if x.ndim == 1:
+        x = np.atleast_2d(x).T
+    sigma = np.atleast_2d(SIGMA) # So we also can use it for 1-d distributions
+
+    N = len(MU)
+    ex1 = np.dot(linalg.inv(sigma), (x.T-mu).T)
+    ex = -0.5 * (x.T-mu).T * ex1
+    if ex.ndim == 2: ex = np.sum(ex, axis = 0)
+    K = 1 / np.sqrt ( np.power(2*np.pi, N) * linalg.det(sigma) )
+    return K*np.exp(ex)
+
+def logmulnormpdf(X, MU, SIGMA):
+    """
+    Evaluates natural log of the PDF for the multivariate Guassian distribution.
+
+    Parameters
+    ----------
+    X : np array
+        Inputs/entries row-wise. Can also be a 1-d array if only a 
+        single point is evaluated.
+    MU : nparray
+        Center/mean, 1d array. 
+    SIGMA : 2d np array
+        Covariance matrix.
+
+    Returns
+    -------
+    prob : 1d np array
+        Log (natural) probabilities for entries in `X`.
+    
+    """
+    # Check if inputs are ok:
+    if MU.ndim != 1:
+        raise ValueError, "MU must be a 1 dimensional array"
+    
+    # Evaluate pdf at points or point:
+    #ex = _cal_ex(X, MU, SIGMA)
+    mu = MU
+    x = X.T
+    if x.ndim == 1:
+        x = np.atleast_2d(x).T
+    sigma = np.atleast_2d(SIGMA) # So we also can use it for 1-d distributions
+
+    N = len(MU)
+    ex1 = np.dot(linalg.inv(sigma), (x.T-mu).T)
+    ex = -0.5 * (x.T-mu).T * ex1
+    if ex.ndim == 2: ex = np.sum(ex, axis = 0)
+    K = -(N/2)*np.log(2*np.pi) - 0.5*np.log(np.linalg.det(SIGMA))
+    return ex + K
+
+def gmm_pdf(X, centroids, ccov, mc, individual=False):
+    """Evaluates the PDF for the multivariate Guassian mixture.
+
+    Draw samples from a Mixture of Gaussians (MoG)
+
+    Parameters
+    ----------
+    centroids : list
+        List of cluster centers - [ [x1,y1,..],..,[xN, yN,..] ]
+    ccov : list
+        List of cluster co-variances DxD matrices
+    mc : list
+        Mixing cofficients for each cluster (must sum to one)
+                  by default equal for each cluster.
+
+    Returns
+    -------
+    prob : 1d np array
+        Probability density values for entries in `X`.
+    """
+    if individual:
+        pdf = np.zeros((len(X), len(centroids)))
+        for i in range(len(centroids)):
+            pdf[:,i] = mulnormpdf(X, centroids[i], ccov[i]) * mc[i]
+        return pdf
+    else:
+        pdf = None
+        for i in range(len(centroids)):
+            pdfadd = mulnormpdf(X, centroids[i], ccov[i]) * mc[i]
+            if pdf==None:
+                pdf = pdfadd
+            else:
+                pdf = pdf + pdfadd
+        return pdf
+
+def sample_gaussian_mixture(centroids, ccov, mc = None, samples = 1):
+    """
+    Draw samples from a Mixture of Gaussians (MoG)
+
+    Parameters
+    ----------
+    centroids : list
+        List of cluster centers - [ [x1,y1,..],..,[xN, yN,..] ]
+    ccov : list
+        List of cluster co-variances DxD matrices
+    mc : list
+        Mixing cofficients for each cluster (must sum to one)
+                  by default equal for each cluster.
+
+    Returns
+    -------
+    X : 2d np array
+         A matrix with samples rows, and input dimension columns.
+
+    Examples
+    --------
+    ::
+
+        from pypr.clustering import *
+        from numpy import *
+        centroids=[array([10,10])]
+        ccov=[array([[1,0],[0,1]])]
+        samples = 10
+        gmm.sample_gaussian_mixture(centroids, ccov, samples=samples)
+
+    """
+    cc = centroids
+    D = len(cc[0]) # Determin dimensionality
+    
+    # Check if inputs are ok:
+    K = len(cc)
+    if mc is None: # Default equally likely clusters
+        mc = np.ones(K) / K
+    if len(ccov) != K:
+        raise ValueError, "centroids and ccov must contain the same number" +\
+            "of elements."
+    if len(mc) != K:
+        raise ValueError, "centroids and mc must contain the same number" +\
+            "of elements."
+
+    # Check if the mixing coefficients sum to one:
+    EPS = 1E-15
+    if np.abs(1-np.sum(mc)) > EPS:
+        raise ValueError, "The sum of mc must be 1.0"
+
+    # Cluster selection
+    cs_mc = np.cumsum(mc)
+    cs_mc = np.concatenate(([0], cs_mc))
+    sel_idx = np.random.rand(samples)
+
+    # Draw samples
+    res = np.zeros((samples, D))
+    for k in range(K):
+        idx = (sel_idx >= cs_mc[k]) * (sel_idx < cs_mc[k+1])
+        ksamples = np.sum(idx)
+        drawn_samples = np.random.multivariate_normal(\
+            cc[k], ccov[k], ksamples)
+        res[idx,:] = drawn_samples
+    return res
+
+def gauss_ellipse_2d(centroid, ccov, sdwidth=1, points=100):
+    """Returns x,y vectors corresponding to ellipsoid at standard deviation sdwidth.
+    """
+    # from: http://www.mathworks.com/matlabcentral/fileexchange/16543
+    mean = np.c_[centroid]
+    tt = np.c_[np.linspace(0, 2*np.pi, points)]
+    x = np.cos(tt); y=np.sin(tt);
+    ap = np.concatenate((x,y), axis=1).T
+    d, v = np.linalg.eig(ccov);
+    d = np.diag(d)
+    d = sdwidth * np.sqrt(d); # convert variance to sdwidth*sd
+    bp = np.dot(v, np.dot(d, ap)) + np.tile(mean, (1, ap.shape[1])) 
+    return bp[0,:], bp[1,:]
+
+
+def em_gm(X, K, iter = 50, verbose = False, \
+                cluster_init = 'sample', \
+                iter_call = None,\
+                delta_stop = 1e-6,\
+                max_tries = 10,\
+                diag_add = 1e-3 ):
+    """Find K cluster centers in X using Expectation Maximization of Gaussian Mixtures.
+   
+    X           : Input data, NxD array, should contain N samples row wise, and D
+                  variablescolumn wise.
+    iter        : Maximum allowed number of iterations/try.
+    cluster_init: Initalize centroids 'sample' or 'kmeans'
+    iter_call   :
+    delta_stop  : Stop when the change in the mean negative log likelihood goes
+                  below this value.
+    max_tries   : The co-variance matrix for some cluster migth end up with NaN
+                  values, then the algorithm will restart; max_tries is the number
+                  of allowed retries.
+    diag_add    : A scalar multiplied by the variance of each feature of the input
+                  data, and added to the diagonal of the covariance matrix at each
+                  iteration.
+
+    Centroid initialization is given by *clusterinit*, the only available option
+    is 'sample'. 'sample' selects random samples as centroids. More will be added.
+
+    Returns a 4-tuple (center_list, cov_list, p_k, logL) containing:
+             A K-length list of cluster centers
+             A K-length list of co-variance matrices
+             An K length array with mixing cofficients (p_k)
+             Log likelihood (how well the data fits the model)
+    """
+
+    samples, dim = np.shape(X)
+
+    if diag_add!=0:
+        feature_var = np.var(X, axis=0)
+        diag_add_vec = diag_add * feature_var
+
+    clusters_found = False
+    while clusters_found==False and max_tries>0:
+        max_tries -= 1
+        # Initialize the centroids
+        if cluster_init == 'sample':
+            center_list = []
+            for i in range(K):
+                center_list.append(X[np.random.randint(samples), :])
+        elif cluster_init == 'kmeans':
+            center_list = []
+            membership, cc = kmeans.kmeans(X, K, iter=100)
+            for i in range(cc.shape[0]):
+                center_list.append(cc[i,:])
+        else:
+            raise "Unknown initialization of EM of MoG centers."
+
+        # Initialize co-variance matrices
+        cov_list = []
+        for i in range(K):
+            cov_list.append(np.diag(np.ones(dim)/1e10))
+            #cov_list.append(np.diag(np.ones(dim)))
+
+        p_k = np.ones(K) / K # Uniform prior on P(k)
+        # Now perform the EM-steps:
+        old_logL = np.NaN
+        try:
+            for i in range(iter):
+                # Refractured so we don't get to nested code:
+                try:
+##                    if diag_add != 0:
+##                        for c in cov_list:
+##                            c = c + np.diag(feature_var * diag_add )
+##                            #c = c + np.diag(np.ones(c.shape[0]) * diag_add )
+                    center_list, cov_list, p_k, logL = __em_gm_step(X, center_list,\
+                        cov_list, p_k, K, diag_add_vec)
+                except np.linalg.linalg.LinAlgError: # Singular cov matrix
+                    raise Cov_problem()
+                if iter_call is not None:
+                    iter_call(center_list, cov_list, i)
+                # Check if we have problems with cluster sizes
+                for i2 in range(len(center_list)):
+                    if np.any(np.isnan(cov_list[i2])):
+                        print "problem"
+                        raise Cov_problem()
+
+                if old_logL != np.NaN:
+                    if verbose:
+                        print "iteration=", i, " delta log likelihood=", \
+                            old_logL - logL
+                    if logL - old_logL < delta_stop * samples:
+                        break # Sufficient precision reached
+                old_logL = logL
+            try:
+                gm_log_likelihood(X, center_list, cov_list, p_k)
+            except np.linalg.linalg.LinAlgError: # Singular cov matrix
+                raise Cov_problem()
+            clusters_found = True
+        except Cov_problem:
+            #if verbose:
+            print "Problems with the co-variance matrix, tries left ", max_tries
+    if clusters_found:
+        return center_list, cov_list, p_k, logL
+    else:
+        raise Cov_problem()
+
+def __em_gm_step(X, center_list, cov_list, p_k, K, diag_add_vec):
+    samples = X.shape[0]
+    # E-step:
+    # Instead we use the log-sum-exp formula
+    #p_Xn = np.zeros(samples)
+    #for k in range(K):
+    #    p_Xn += mulnormpdf(X, center_list[k], cov_list[k]) * p_k[k]
+    
+##    log_p_Xn = np.zeros(samples)
+##    for k in range(K):
+##        p = logmulnormpdf(X, center_list[k], cov_list[k]) + np.log(p_k[k])
+##        if k == 0:
+##            log_p_Xn = p
+##        else:
+##            pmax = np.max(np.concatenate((np.c_[log_p_Xn], np.c_[p]), axis=1), axis=1)
+##            log_p_Xn = pmax + np.log( np.exp( log_p_Xn - pmax) + np.exp( p-pmax))
+##    logL = np.sum(log_p_Xn)
+    
+    # New way of calculating the log likelihood:
+    log_p_Xn_mat = np.zeros((samples, K))
+    for k in range(K):
+        log_p_Xn_mat[:,k] = logmulnormpdf(X, center_list[k], cov_list[k]) + np.log(p_k[k])
+    pmax = np.max(log_p_Xn_mat, axis=1)
+    log_p_Xn = pmax + np.log( np.sum( np.exp(log_p_Xn_mat.T - pmax), axis=0).T) # Maybe move this down
+    logL = np.sum(log_p_Xn)
+
+    # Instead we use log-sum-exp formula
+    #p_nk = np.zeros((samples, K))
+    #for k in range(K):
+    #    p_nk[:,k] = mulnormpdf(X, center_list[k], cov_list[k]) * p_k[k] / p_Xn
+    
+    log_p_nk = np.zeros((samples, K))
+    for k in range(K):
+        #log_p_nk[:,k] = logmulnormpdf(X, center_list[k], cov_list[k]) + np.log(p_k[k]) - log_p_Xn
+        log_p_nk[:,k] = log_p_Xn_mat[:,k] - log_p_Xn
+
+    p_Xn = np.e**log_p_Xn
+    p_nk = np.e**log_p_nk
+
+    # M-step:    
+    for k in range(K):
+        ck = np.sum(p_nk[:,k] * X.T, axis = 1) / np.sum(p_nk[:,k])
+        center_list[k] = ck
+        cov_list[k] = np.dot(p_nk[:,k] * ((X - ck).T), (X - ck)) / sum(p_nk[:,k])\
+            + np.diag(diag_add_vec)
+        p_k[k] = np.sum(p_nk[:,k]) / samples
+
+    return (center_list, cov_list, p_k, logL)
+
+def gm_log_likelihood(X, center_list, cov_list, p_k):
+    """Finds the likelihood for a set of samples belongin to a Gaussian mixture
+    model.
+    
+    Return log likelighood
+    """
+    samples = X.shape[0]
+    K =  len(center_list)
+    log_p_Xn = np.zeros(samples)
+    for k in range(K):
+        p = logmulnormpdf(X, center_list[k], cov_list[k]) + np.log(p_k[k])
+        if k == 0:
+            log_p_Xn = p
+        else:
+            pmax = np.max(np.concatenate((np.c_[log_p_Xn], np.c_[p]), axis=1), axis=1)
+            log_p_Xn = pmax + np.log( np.exp( log_p_Xn - pmax) + np.exp( p-pmax))
+    logL = np.sum(log_p_Xn)
+    return logL
+
+def gm_assign_to_cluster(X, center_list, cov_list, p_k):
+    """Assigns each sample to one of the Gaussian clusters given.
+    
+    Returns an array with numbers, 0 corresponding to the first cluster in the
+    cluster list.
+    """
+    # Reused code from E-step, should be unified somehow:
+    samples = X.shape[0]
+    K = len(center_list)
+    log_p_Xn_mat = np.zeros((samples, K))
+    for k in range(K):
+        log_p_Xn_mat[:,k] = logmulnormpdf(X, center_list[k], cov_list[k]) + np.log(p_k[k])
+    pmax = np.max(log_p_Xn_mat, axis=1)
+    log_p_Xn = pmax + np.log( np.sum( np.exp(log_p_Xn_mat.T - pmax), axis=0).T)
+    logL = np.sum(log_p_Xn)
+    
+    log_p_nk = np.zeros((samples, K))
+    for k in range(K):
+        #log_p_nk[:,k] = logmulnormpdf(X, center_list[k], cov_list[k]) + np.log(p_k[k]) - log_p_Xn
+        log_p_nk[:,k] = log_p_Xn_mat[:,k] - log_p_Xn
+    
+    print log_p_nk
+    #Assign to cluster:
+    maxP_k = np.c_[np.max(log_p_nk, axis=1)] == log_p_nk
+    #print np.max(log_p_nk, axis=1)
+    maxP_k = maxP_k * (np.array(range(K))+1)
+    return np.sum(maxP_k, axis=1) - 1
+
+
+class Cov_problem(Exception):
+    """
+    """
+    pass
+
+def cond_dist(Y, centroids, ccov, mc):
+    """Finds the conditional distribution p(X|Y) for a GMM.
+
+    Y         : An array of inputs. Inputs set to NaN are not set, and
+                become inputs to the resulting distribution. Order is
+                preserved.
+    centroids : List of cluster centers - [ [x1,y1,..],..,[xN, yN,..] ]
+    ccov      : List of cluster co-variances DxD matrices
+    mc        : Mixing cofficients for each cluster (must sum to one)
+                  by default equal for each cluster.
+
+    Example:    
+    
+    Returns: A tuple containing a new set of (centroids, ccov, mc)
+             for the conditional distribution.
+    """
+    not_set_idx = np.nonzero(np.isnan(Y))[0]
+    set_idx = np.nonzero(True - np.isnan(Y))[0]
+    new_idx = np.concatenate((not_set_idx, set_idx))
+    y = Y[set_idx]
+    # New centroids and covar matrices
+    new_cen = []
+    new_ccovs = []
+    # Appendix A in C. E. Rasmussen & C. K. I. Williams, Gaussian Processes
+    # for Machine Learning, the MIT Press, 2006
+    fk = []
+    for i in range(len(centroids)):
+        # Make a new co-variance matrix with correct ordering
+        new_ccov = copy.deepcopy(ccov[i])
+        new_ccov = new_ccov[:,new_idx]
+        new_ccov = new_ccov[new_idx,:]
+        ux = centroids[i][not_set_idx]
+        uy = centroids[i][set_idx]
+        A = new_ccov[0:len(not_set_idx), 0:len(not_set_idx)]
+        B = new_ccov[len(not_set_idx):, len(not_set_idx):]
+        C = new_ccov[0:len(not_set_idx), len(not_set_idx):]
+        cen = ux + np.dot(np.dot(C, np.linalg.inv(B)), (y - uy))
+        cov = A - np.dot(np.dot(C, np.linalg.inv(B)), C.transpose())
+        new_cen.append(cen)
+        new_ccovs.append(cov)
+        fk.append(mulnormpdf(Y[set_idx], uy, B)) # Used for normalizing the mc
+    # Normalize the mixing coef: p(X|Y) = p(Y,X) / p(Y) using the marginal dist.
+    fk = np.array(fk).flatten()
+    new_mc = (mc*fk)
+    new_mc = new_mc / np.sum(new_mc)
+    return (new_cen, new_ccovs, new_mc)
+
+def marg_dist(X_idx, centroids, ccov, mc):
+    """Finds the marginal distribution p(X) for a GMM.
+
+    X_idx     : 
+    centroids : List of cluster centers - [ [x1,y1,..],..,[xN, yN,..] ]
+    ccov      : List of cluster co-variances DxD matrices
+    mc        : Mixing cofficients for each cluster (must sum to one)
+                  by default equal for each cluster.
+    Returns: A tuple containing a new set of (centroids, ccov, mc)
+             for the conditional distribution.
+    """
+    new_cen = []
+    new_cov = []
+    for i in range(len(centroids)):
+        new_cen.append(centroids[i][X_idx])
+        new_cov.append(ccov[i][X_idx,:][:,X_idx])
+    new_mc = mc
+    return (new_cen, new_cov, new_mc)
+
