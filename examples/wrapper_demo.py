@@ -31,4 +31,7 @@ err = opt.minimize(dm.get_parameters(), dm.err_func, dm.err_func_d, 10)
 
 # Wrap model for easy use:
 ev = wrap_model(X, (normX.transform, nn.forward, normT.invtransform), **names)
-s
+
+print "ev(X) =", ev(X)
+print "ev(waterspeed=20) =", ev(waterspeed=20)
+print "ev(X, waterspeed=20) =", ev(X, waterspeed=20)

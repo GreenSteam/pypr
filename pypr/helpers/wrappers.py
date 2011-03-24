@@ -5,22 +5,21 @@ import copy
 
 def wrap_model(X0, functions, **indices): #, norm_x, norm_t, ann, **indices):
     """
-    Wrap a Artificial Neural Network with a normalizer for the inputs, a
-    normalizer for the output, and named indices for variable that can
-    be set in the wrapper.
+    Wrap a chain of function calls. It is typical to call a series of functions
+    to obtain a result from a model. For example a preprocessing function, 
+    a model call, and a post-processing function. X0 is a defalt input for the
+    function chain.
 
     Parameters
     ----------
     X0 : np array
-        Default input for network. Samples row-wise, dimensions column-wise.
-    norm_x : Normalizer
-        Normalizer for network inputs.
-    norm_t : Normalizer
-        Normalizer for network outputs.        
-    ann : ANN
-        Artificial neural network to wrap.
+        Default input for the chain. Samples row-wise, dimensions column-wise.
+    functions : list of functions
+        The list is called from left to right. For exaple [a,b,c] would result
+        in c(b(a(X0)))
     **indices : dictionary, optional
-        Specify an index for each variable that can be set by the wrapper.
+        Specify a names for the colums in X0 or the input. For example saying
+        that the first colums is called speed: {'speed':0}
 
     Returns
     -------
@@ -38,17 +37,23 @@ def wrap_model(X0, functions, **indices): #, norm_x, norm_t, ann, **indices):
 
     def eval_wrap(*X, **values):
         """
-        Evaluate normalized output for an ANN with with a normalized X as input.
+        Evaluates a chain of functions.
 
         Parameters
         ----------
         *X : np array, optional
             Samples row-wise, inputs/dimensions column-wise. If specified
-            this `X` will be used instead of the original given in the
+            this `X` will be used instead of the original X0 given in the
             wrapper constructor.
         **values : dictionary, optional
             Specify input name and the value it should be set to, for example
-            one could say "Speed=1.0" to set the speed column to 1.0.
+            one could say "Speed=1.0" to set all the speed column to 1.0.
+
+        Examples
+        --------
+        eval_wrap(X)
+        eval_wrap(waterspeed=20)
+        eval_wrap(X, waterspeed=20)
 
         Returns
         -------
