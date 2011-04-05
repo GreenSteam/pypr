@@ -1,6 +1,7 @@
 
 import pypr.ann as ann
 import pypr.ann.activation_functions as af
+import pypr.ann.error_functions as ef
 import random
 import unittest
 import numpy as np
@@ -43,11 +44,22 @@ class TestANN(unittest.TestCase):
         This is done using the finite difference gradient.
         Multiple, two actually, outputs are tested :)
         """
-        a = ann.ANN([2,5,7,2], [af.sigmoid, af.tanh, af.tanh])
-        inputs = np.array([[1, 4], [2, 3]])
-        targets = np.array([[4, 2], [5, 4]])
+        a = ann.ANN([2,5,7,3,2], [af.sigmoid, af.tanh, af.lin, af.squash])
+        inputs = np.array([[1, 4], [2, 3], [3, 1]])
+        targets = np.array([[0.4, 0.6], [0.5, 0.5], [0.8, 0.2]])
         dw1 = a.gradient(inputs, targets)
         dw2 = a._gradient_finite_difference(inputs, targets)
+        totsum = calc_weight_abs_diff(dw1, dw2)
+        self.assertAlmostEqual(totsum, 0.0, places=3)
+
+    def test_softmax_gradient(self):
+        """
+        """
+        a = ann.ANN([2,5,2], [af.sigmoid, af.softmax])
+        inputs = np.array([[1, 4], [2, 3], [3, 1]])
+        targets = np.array([[0.4, 0.6], [0.5, 0.5], [0.8, 0.2]])
+        dw1 = a.gradient(inputs, targets, errorfunc=ef.entropic)
+        dw2 = a._gradient_finite_difference(inputs, targets, errorfunc=ef.entropic)
         totsum = calc_weight_abs_diff(dw1, dw2)
         self.assertAlmostEqual(totsum, 0.0, places=3)
         

@@ -17,7 +17,7 @@ class ANN():
     A simple implementation of a feed forward neural network.
     """
     
-    def __init__(self, nodes, afunc=[]):
+    def __init__(self, nodes, afunc=[], errorfunc=None):
         """
         Create an Artificial Neural Network (ANN)
         
@@ -41,7 +41,10 @@ class ANN():
         
         """
         self.weights = self._create_weights(nodes)
-        self._error_func = ef.sum_of_squares # Default
+        if errorfunc==None:
+            self._error_func = ef.sum_of_squares # Default
+        else:
+            self._error_func = errorfunc
         if len(afunc)==0:
             self.act_funcs = []
             for i in range(0, len(nodes)-2):
@@ -55,7 +58,9 @@ class ANN():
         Returns
         -------
         error_func : function
-            The error function.
+            The error function. This function can be overwritten, so for example
+            a network with weight decay will return the error function with the
+            weight decay penality.
         """
         return self._error_func
 
@@ -65,7 +70,8 @@ class ANN():
         -------
         error_func : function
             This is the error function which back propagation uses. Should
-            normally not be overwritten.
+            normally not be overwritten. This error function does not include
+            the weight decay.
         """
         return self._error_func
         
@@ -442,5 +448,7 @@ decay, otherwise it works just like an ANN.
         return ef_res + 0.5 * self.v * sum_of_square_weights
     
     def get_error_func(self):
+        """Returns a modified error function with a weight decay penalty.
+        """
         return (self.error_with_weight_penalty, None)
     

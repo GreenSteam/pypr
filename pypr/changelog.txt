@@ -1,0 +1,4 @@
+
+0.1rc2: 20110405
+* Added support for softmax activation function and and cross entropy error
+  function.
