@@ -212,34 +212,49 @@ def gauss_ellipse_2d(centroid, ccov, sdwidth=1, points=100):
 
 def em_gm(X, K, iter = 50, verbose = False, \
                 cluster_init = 'sample', \
+                cluster_init_prop = None, \
                 iter_call = None,\
                 delta_stop = 1e-6,\
                 max_tries = 10,\
                 diag_add = 1e-3 ):
     """Find K cluster centers in X using Expectation Maximization of Gaussian Mixtures.
    
-    X           : Input data, NxD array, should contain N samples row wise, and D
-                  variablescolumn wise.
-    iter        : Maximum allowed number of iterations/try.
-    cluster_init: Initalize centroids 'sample' or 'kmeans'
-    iter_call   :
-    delta_stop  : Stop when the change in the mean negative log likelihood goes
-                  below this value.
-    max_tries   : The co-variance matrix for some cluster migth end up with NaN
-                  values, then the algorithm will restart; max_tries is the number
-                  of allowed retries.
-    diag_add    : A scalar multiplied by the variance of each feature of the input
-                  data, and added to the diagonal of the covariance matrix at each
-                  iteration.
+    Parameters
+    -----------
+    X : NxD array
+        Input data. Should contain N samples row wise, and D variablescolumn wise.
+    iter : int
+        Maximum allowed number of iterations/try.
+    cluster_init : string
+        How to initalize centroids: 'sample' or 'kmeans'
+    cluster_init_prop : dict
+        Passed to the kmeans (if used) as keyword arguments
+    iter_call : callable
+        Called for each iteration
+    delta_stop : float
+        Stop when the change in the mean negative log likelihood goes below this
+        value.
+    max_tries : int
+        The co-variance matrix for some cluster migth end up with NaN values, then
+        the algorithm will restart; max_tries is the number of allowed retries.
+    diag_add : float
+        A scalar multiplied by the variance of each feature of the input data, 
+        and added to the diagonal of the covariance matrix at each iteration.
 
-    Centroid initialization is given by *clusterinit*, the only available option
-    is 'sample'. 'sample' selects random samples as centroids. More will be added.
+    Centroid initialization is given by *cluster_init*, the only available options
+    are 'sample' and 'kmeans'. 'sample' selects random samples as centroids. 'kmeans'
+    calls kmeans to find the cluster centers.
 
-    Returns a 4-tuple (center_list, cov_list, p_k, logL) containing:
-             A K-length list of cluster centers
-             A K-length list of co-variance matrices
-             An K length array with mixing cofficients (p_k)
-             Log likelihood (how well the data fits the model)
+    Returns
+    -------
+    center_list : list
+        A K-length list of cluster centers
+    cov_list : list
+        A K-length list of co-variance matrices
+    p_k : list
+        An K length array with mixing cofficients (p_k)
+    logLL : list
+         Log likelihood (how well the data fits the model)
     """
 
     samples, dim = np.shape(X)
@@ -258,7 +273,7 @@ def em_gm(X, K, iter = 50, verbose = False, \
                 center_list.append(X[np.random.randint(samples), :])
         elif cluster_init == 'kmeans':
             center_list = []
-            membership, cc = kmeans.kmeans(X, K, iter=100)
+            membership, cc = kmeans.kmeans(X, K, iter=100, **cluster_init_prop)
             for i in range(cc.shape[0]):
                 center_list.append(cc[i,:])
         else:
