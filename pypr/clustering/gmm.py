@@ -216,7 +216,8 @@ def em_gm(X, K, iter = 50, verbose = False, \
                 iter_call = None,\
                 delta_stop = 1e-6,\
                 max_tries = 10,\
-                diag_add = 1e-3 ):
+                diag_add = 1e-3,\
+                max_init_iter = 1 ):
     """Find K cluster centers in X using Expectation Maximization of Gaussian Mixtures.
    
     Parameters
@@ -273,7 +274,15 @@ def em_gm(X, K, iter = 50, verbose = False, \
                 center_list.append(X[np.random.randint(samples), :])
         elif cluster_init == 'kmeans':
             center_list = []
-            membership, cc = kmeans.kmeans(X, K, iter=100, **cluster_init_prop)
+            best_icv = np.inf
+            for i in range(max_init_iter):
+                m, kcc = kmeans.kmeans(X, K, iter=100, **cluster_init_prop)
+                icv = kmeans.find_intra_cluster_variance(X, m, kcc)
+                if best_icv > icv:
+                    print "New start centers: ", best_icv, icv
+                    membership = m
+                    cc = kcc
+                    best_icv = icv
             for i in range(cc.shape[0]):
                 center_list.append(cc[i,:])
         else:
