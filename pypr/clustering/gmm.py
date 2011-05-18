@@ -217,7 +217,8 @@ def em_gm(X, K, iter = 50, verbose = False, \
                 delta_stop = 1e-6,\
                 max_tries = 10,\
                 diag_add = 1e-3,\
-                max_init_iter = 1 ):
+                max_init_iter = 1, \
+                cov_init = 'iso'):
     """Find K cluster centers in X using Expectation Maximization of Gaussian Mixtures.
    
     Parameters
@@ -290,9 +291,15 @@ def em_gm(X, K, iter = 50, verbose = False, \
 
         # Initialize co-variance matrices
         cov_list = []
-        for i in range(K):
-            cov_list.append(np.diag(np.ones(dim)/1e10))
-            #cov_list.append(np.diag(np.ones(dim)))
+        if cov_init=='iso':
+            for i in range(K):
+                cov_list.append(np.diag(np.ones(dim)/1e10))
+                #cov_list.append(np.diag(np.ones(dim)))
+        elif cov_init=='var':
+            for i in range(K):
+                cov_list.append(np.diag(np.var(X, axis=0)/1e10))
+        else:
+            raise ValueError('Unknown option used for cov_init')
 
         p_k = np.ones(K) / K # Uniform prior on P(k)
         # Now perform the EM-steps:
