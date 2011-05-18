@@ -35,5 +35,28 @@ def RMSE(y, t, axis=None):
     """Returns the Root Mean Square Error (RMSE).
     """
     return np.sqrt(MSE(y, t, axis=axis))
-    
+
+def k_fold_cross_validation(X, K, k, inv=False):
+    """K-fold cross-validation.
+
+    Usage:
+    X : NxD array
+        Input data (N samples row-wise)
+    K : int
+        Numer of folds to make.
+    k : int
+        Fold number to leave out. Ranges from [0; K-1]
+    inv : bool
+        If true, then return the left out fold instead.
+    """
+    N = X.shape[0]
+    d = np.linspace(0, N, K+1)
+    d = np.array(d, dtype=np.int)
+    if inv:
+        return X[d[k]:d[k+1],:]
+    else:
+        X1 = X[d[0]:d[k], :]
+        X2 = X[d[k+1]:, :]
+        return np.concatenate((X1, X2), axis=0)
+
 
