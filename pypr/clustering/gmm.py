@@ -245,7 +245,7 @@ def gmm_em_continue(X, center_list, cov_list, p_k,
             if verbose:
                 print "iteration=", i, " delta log likelihood=", \
                     old_logL - logL
-            if logL - old_logL < delta_stop * samples:
+            if np.abs(logL - old_logL) < delta_stop: #* samples:
                 break # Sufficient precision reached
         old_logL = logL
     try:
