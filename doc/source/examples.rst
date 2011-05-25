@@ -48,4 +48,16 @@ Finding the Number of Clusters to use in a Gaussian Mixture Model
 
 
 
+.. _iris_example:
+
+Multiclass classification using ANN
+-----------------------------------
+
+.. literalinclude:: ../../examples/iris.py
+
+When runned the program will generate an output similar to this::
+
+    >>> execfile('iris.py')
+    Correct predictions = 150
+    Incorrect predictions = 0
 

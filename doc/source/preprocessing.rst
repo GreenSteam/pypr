@@ -9,4 +9,5 @@ Contents:
 
    normalization
    pca
+   lag_space_matrix
 

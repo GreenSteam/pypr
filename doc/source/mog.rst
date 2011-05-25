@@ -35,7 +35,7 @@ and given :math:`\mathcal{N} (\mathbf{x} | \boldsymbol\mu_k, \mathbf{\Sigma}_k) 
     0 \geq \pi_k \geq 1
 
 Sampling and Probability Density Function
-^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 PyPR has some simple support for sampling from Gaussian Mixture Models.
 
@@ -124,25 +124,22 @@ The out commented code performs the same calculations, but without the log-sum-e
 Gaussian Mixtures Regression
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-It is also possible to use a mixture of gaussians for regression. 
-
 Let :math:`\mathbf{x}` and :math:`\mathbf{x}` be jointly Gaussian vectors see appendix A in [bishop2006]_.
 
-\begin{equation}
- \left [ \begin{array}{c} \mathbf{x} \\ \mathbf{y} \end{array} \right ] \sim
- \mathcal{N} \left (
-   \left [ \begin{array}{c} \mathbf{{\mu}}_x \\ \mathbf{{\mu}}_y \end{array} \right ],
-   \left [ \begin{array}{cc} A & C \\ C^T & B \end{array} \right ],   
- \right )
-\end{equation}
+.. math::
+    \left [ \begin{array}{c} \mathbf{x} \\ \mathbf{y} \end{array} \right ] \sim
+    \mathcal{N} \left (
+    \left [ \begin{array}{c} \mathbf{{\mu}}_x \\ \mathbf{{\mu}}_y \end{array} \right ],
+    \left [ \begin{array}{cc} A & C \\ C^T & B \end{array} \right ],   
+    \right )
 
 then the conditional distribution of $\mathbf{x}$ given $\mathbf{y}$ can be written as 
 
-\begin{equation}
- \mathbf{x} | \mathbf{y} \sim
- \mathcal{N} \left ( \mathbf{{\mu}}_x + CB^{-1}(\mathbf{y}-\mathbf{\mu_{y}}), A-CB^{-1}C^T) \right )
-\end{equation}
+.. math::
+    \mathbf{x} | \mathbf{y} \sim
+    \mathcal{N} \left ( \mathbf{{\mu}}_x + CB^{-1}(\mathbf{y}-\mathbf{\mu_{y}}), A-CB^{-1}C^T) \right )
 
+It is also possible to use a mixture of gaussians for regression. 
 The plot in figure \ref{fig:em_gm_cond} show the conditional distribution of $\mathbf{x}$ given $\mathbf{x}$ = 0.
 
 \begin{figure}[htb]

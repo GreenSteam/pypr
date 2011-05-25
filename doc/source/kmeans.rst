@@ -17,6 +17,10 @@ where :math:`K` is the total number of clusters, :math:`S_i` the set of points i
     Initialization
     Stopping
 
+When k-means has minimized the intra-cluster variance, it might not have found the global minimum of variance.
+It is therefore a good idea to run the algorithm several times, and use the clustering result with the best intra-cluster variance.
+The intra-cluster variance can be obtained from the method ``find_intra_cluster_variance``.
+
 .. [wikikmeans] http://en.wikipedia.org/w/index.php?title=K-means_algorithm&oldid=280702005
 
 K-Means Example

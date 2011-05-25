@@ -209,8 +209,53 @@ def gauss_ellipse_2d(centroid, ccov, sdwidth=1, points=100):
     bp = np.dot(v, np.dot(d, ap)) + np.tile(mean, (1, ap.shape[1])) 
     return bp[0,:], bp[1,:]
 
+def gmm_em_continue(X, center_list, cov_list, p_k,
+                    max_iter = 50, verbose = False, \
+                    iter_call = None,\
+                    delta_stop = 1e-6,\
+                    diag_add = 1e-3):
+    """
+    """
+    samples, dim = np.shape(X)
+    K = len(center_list) # We should do some input checking
+    if diag_add!=0:
+        feature_var = np.var(X, axis=0)
+        diag_add_vec = diag_add * feature_var
+    old_logL = np.NaN
+    logL = np.NaN
+    for i in range(max_iter):
+        try:
+##                    if diag_add != 0:
+##                        for c in cov_list:
+##                            c = c + np.diag(feature_var * diag_add )
+##                            #c = c + np.diag(np.ones(c.shape[0]) * diag_add )
+            center_list, cov_list, p_k, logL = __em_gm_step(X, center_list,\
+                cov_list, p_k, K, diag_add_vec)
+        except np.linalg.linalg.LinAlgError: # Singular cov matrix
+            raise Cov_problem()
+        if iter_call is not None:
+            iter_call(center_list, cov_list, p_k, i)
+        # Check if we have problems with cluster sizes
+        for i2 in range(len(center_list)):
+            if np.any(np.isnan(cov_list[i2])):
+                print "problem"
+                raise Cov_problem()
 
-def em_gm(X, K, iter = 50, verbose = False, \
+        if old_logL != np.NaN:
+            if verbose:
+                print "iteration=", i, " delta log likelihood=", \
+                    old_logL - logL
+            if logL - old_logL < delta_stop * samples:
+                break # Sufficient precision reached
+        old_logL = logL
+    try:
+        gm_log_likelihood(X, center_list, cov_list, p_k)
+    except np.linalg.linalg.LinAlgError: # Singular cov matrix
+        raise Cov_problem()
+    return center_list, cov_list, p_k, logL
+
+
+def em_gm(X, K, max_iter = 50, verbose = False, \
                 cluster_init = 'sample', \
                 cluster_init_prop = None, \
                 iter_call = None,\
@@ -225,14 +270,14 @@ def em_gm(X, K, iter = 50, verbose = False, \
     -----------
     X : NxD array
         Input data. Should contain N samples row wise, and D variablescolumn wise.
-    iter : int
+    max_iter : int
         Maximum allowed number of iterations/try.
     cluster_init : string
         How to initalize centroids: 'sample' or 'kmeans'
     cluster_init_prop : dict
         Passed to the kmeans (if used) as keyword arguments
     iter_call : callable
-        Called for each iteration
+        Called for each iteration: iter_call(center_list, cov_list, p_k, i)
     delta_stop : float
         Stop when the change in the mean negative log likelihood goes below this
         value.
@@ -260,10 +305,6 @@ def em_gm(X, K, iter = 50, verbose = False, \
     """
 
     samples, dim = np.shape(X)
-
-    if diag_add!=0:
-        feature_var = np.var(X, axis=0)
-        diag_add_vec = diag_add * feature_var
 
     clusters_found = False
     while clusters_found==False and max_tries>0:
@@ -303,42 +344,18 @@ def em_gm(X, K, iter = 50, verbose = False, \
 
         p_k = np.ones(K) / K # Uniform prior on P(k)
         # Now perform the EM-steps:
-        old_logL = np.NaN
-        try:
-            for i in range(iter):
-                # Refractured so we don't get to nested code:
-                try:
-##                    if diag_add != 0:
-##                        for c in cov_list:
-##                            c = c + np.diag(feature_var * diag_add )
-##                            #c = c + np.diag(np.ones(c.shape[0]) * diag_add )
-                    center_list, cov_list, p_k, logL = __em_gm_step(X, center_list,\
-                        cov_list, p_k, K, diag_add_vec)
-                except np.linalg.linalg.LinAlgError: # Singular cov matrix
-                    raise Cov_problem()
-                if iter_call is not None:
-                    iter_call(center_list, cov_list, i)
-                # Check if we have problems with cluster sizes
-                for i2 in range(len(center_list)):
-                    if np.any(np.isnan(cov_list[i2])):
-                        print "problem"
-                        raise Cov_problem()
 
-                if old_logL != np.NaN:
-                    if verbose:
-                        print "iteration=", i, " delta log likelihood=", \
-                            old_logL - logL
-                    if logL - old_logL < delta_stop * samples:
-                        break # Sufficient precision reached
-                old_logL = logL
-            try:
-                gm_log_likelihood(X, center_list, cov_list, p_k)
-            except np.linalg.linalg.LinAlgError: # Singular cov matrix
-                raise Cov_problem()
+        try:
+            center_list, cov_list, p_k, logL = gmm_em_continue(X, center_list, cov_list, p_k,
+                        max_iter = max_iter, verbose=verbose,
+                        iter_call=iter_call,
+                        delta_stop=delta_stop,
+                        diag_add=diag_add)
             clusters_found = True
         except Cov_problem:
-            #if verbose:
-            print "Problems with the co-variance matrix, tries left ", max_tries
+            if verbose:
+                print "Problems with the co-variance matrix, tries left ", max_tries
+
     if clusters_found:
         return center_list, cov_list, p_k, logL
     else:
@@ -511,4 +528,6 @@ def marg_dist(X_idx, centroids, ccov, mc):
         new_cov.append(ccov[i][X_idx,:][:,X_idx])
     new_mc = mc
     return (new_cen, new_cov, new_mc)
+
+gmm_find = em_gm
 

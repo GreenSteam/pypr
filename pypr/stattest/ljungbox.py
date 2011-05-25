@@ -2,25 +2,6 @@
 import numpy as np
 import scipy.stats
 
-def bic(LogL, M, N):
-    """
-    Bayesian Information Criteria
-
-    Parameters
-    ----------
-    LogL : scalar
-        Log likelihood value from model and data
-    M : int
-        Number of free parameters
-    N : int
-        Number of samples
-
-    Returns
-    -------
-    score : scalar
-        The BIC value (LogL - 0.5 * M * np.log(N))
-    """
-    return LogL - 0.5 * M * np.log(N)
 
 def sac(x, k=1):
     """

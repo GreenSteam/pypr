@@ -125,8 +125,9 @@ NN.
 
 Purpose of error function
 
-Activation Functions
---------------------
+Activation and Error Functions
+------------------------------
+
 The activation functions are implemented in ``pypr.ann.activation_functions``.
 The are implemented as 2-tuples. The first element is a reference to the activation
 function, and the second a reference to its derivative with regard to the input value.
@@ -145,18 +146,65 @@ function, and the second a reference to its derivative with regard to the input 
 The value passed to derivative method is actually :math:`g(x)`, and not :math:`x`.
 One should only be aware of this, if implementing new activation functions.
 
+Here is a toy example where we assign all three activation functions::
 
-Error Functions
----------------
+    import pypr.ann as ann
+    import pypr.ann.activation_functions as af
+    nn = ann.WeightDecayANN([1,1,1,1], [af.tanh, af.sigmoid, af.lin]))
 
-Selecting activation and error functions.
+
+TODO: Selecting activation and error functions.
+
+
+Classification
+--------------
+
+A neural network can be trained to find the posterior probabilities, which reflects the uncertainty that a sample belongs to a given set of classes.
+A general case of classification, is when the observations have to be classified into :math:`K` classes.
+The ANN will have :math:`K` outputs, one for each class.
+If the observation belongs to a class :math:`k` the corresponding output number will be 1, otherwise the outputs are 0.
+This is called a 1-of-K binary coding scheme.
+
+If the output of the network should be considered as probabilities, they have to fulfill some requirements, which are :math:`0 \le y_k \le 1` and
+:math:`\sum_k y_k=1`.
+
+This can be achieved using the softmax activation function
 
 .. math::
-    y_k = y_k \left ( x ; w \right )
+    y_k = \frac{\exp (a_k)}{\sum_{k'} \exp (a_{k'})}
 
+According to [bishop95]_ the conditional distribution for this setup can be written as
+
+.. math::
+    p( \mathbf{t}^n | \mathbf{x}^n) = \prod_{k=1}^c \left ( y_k^n \right ) ^ {t_k^n}
+
+and the negative log likelihood function of the cross entropy can be expressed as
+
+.. math::
+    E_{ce} = - \sum_n \sum_{k=1}^c t_k^n \ln y_k^n
+
+.. ATTENTION::
+    The entropic cost function and softmax activation function must be used together due to the implementation.
+    If the entropic cost function is used, then the softmax activation function must be used on the output layer.
+    And the softmax activation function can only be used in this layer.
+
+:ref:`iris_example` gives a classification example of the well-known Iris dataset using the softmax activation function and cross entropy error function.
+
+Implementation overview
+-----------------------
+
+The ANN is implemented in a class called ``ANN`` and extended by ``WeightDecayANN``, which adds weight decay support.
+This is done by modifying the gradient and error functions accordingly.
+
+The ANN class can flatten the weights in all the layer into a vector.
+This is handy, because then general purpose function minimization can be used for training the ANN. 
+
+
+.. [elliott] Technical Research Report, A Better Activation Function for Artificial Neural Networks, D.L. Elliott, University of Maryland, 1993
 
 .. [bishop95] Neural Networks for Pattern Recognition, Christopher M. Bishop, Oxford University Press, 1995
 
+.. [bishop06] Pattern Recognition and Machine Learning, Christopher M. Bishop, Springer, 2006
 
 Application Programming Interface
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

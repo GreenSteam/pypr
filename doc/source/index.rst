@@ -29,6 +29,11 @@ Contents:
    helpers
    stattest
    examples
+   auto/modules
+
+..
+    auto/modules are generated with:
+    https://bitbucket.org/etienned/sphinx-autopackage-script/src
 
 Indices and tables
 ==================
