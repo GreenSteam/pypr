@@ -111,15 +111,14 @@ As each point has a probability of belonging to a cluster, :math:`p_{nk}`, we ha
 .. math::
     \hat{p}(k) = \frac{1}{N}\sum_n p_{nk}
 
-EXAMPLE OF USING EM GMM.
+The function :func:`pypr.clustering.gmm.gmm_find` (earlier called *em_gm*) is used to called to initialise and find the GMM.
+It will retry *max_tries* times if it encounters problems with the covariance matrix.
+The methods calls :func:`pypr.clustering.gmm_init` to initalized the clusters, and the keyword arguments passed to this can be specified using ``init_kw`` parameter.
 
-Expectation maximization steps with Gaussian mixtures. Only every other iteration step is plotted.
+
+It can be problematic to initalize the EM algorithm with the ``box`` initalization, as it might be numerically challenging calculating the log likelihood in the first step. Initalizing the EM algorithm with with either ``sample`` or ``kmeans`` should not pose any problems.
 
 If you examine the code for the used to perform the EM algorithm on the mixture of gaussians, *em_gm*, you can see that the code uses the log-sum-exp formula \cite{numericalrecipes} to avoid underflow in the floating point calculations.
-The out commented code performs the same calculations, but without the log-sum-exp formula.
-
-..
-    Problems can however still occur: ...when...
 
 Gaussian Mixtures Regression
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

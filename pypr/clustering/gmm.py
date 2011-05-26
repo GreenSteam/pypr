@@ -209,13 +209,159 @@ def gauss_ellipse_2d(centroid, ccov, sdwidth=1, points=100):
     bp = np.dot(v, np.dot(d, ap)) + np.tile(mean, (1, ap.shape[1])) 
     return bp[0,:], bp[1,:]
 
+
+
+def gmm_init(X, K, verbose = False,
+                    cluster_init = 'sample', \
+                    cluster_init_prop = {}, \
+                    max_init_iter = 5, \
+                    cov_init = 'var'):
+    """Initialize a Gaussian Mixture Model (GMM).
+    Generates a set of inital parameters for the GMM.
+
+    Paramseters
+    -----------
+    cluster_init : string
+        How to initalize centroids: 'sample', 'box', or 'kmeans'
+    cluster_init_prop : dict
+        Passed to the k-means (if used) as keyword arguments
+    max_init_iter : int
+        How often to try k-means (best final result is used)
+    cov_init : string
+        Either 'iso' or 'var'
+
+    Returns
+    -------
+    center_list : list
+        A K-length list of cluster centers
+    cov_list : list
+        A K-length list of co-variance matrices
+    p_k : list
+        An K length array with mixing cofficients
+    """
+    samples, dim = np.shape(X)
+    if cluster_init == 'sample':
+        if verbose: print "Using sample GMM initalization."
+        center_list = []
+        for i in range(K):
+            center_list.append(X[np.random.randint(samples), :])
+    elif cluster_init == 'box':
+        if verbose: print "Using box GMM initalization."
+        center_list = []
+        X_max = np.max(X, axis=0)
+        X_min = np.min(X, axis=0)
+        for i in range(K):
+            init_point = ((X_max-X_min)*np.random.rand(1,dim)) + X_min
+            center_list.append(init_point.flatten())            
+    elif cluster_init == 'kmeans':
+        if verbose: print "Using K-means GMM initalization."
+        # TODO: Normalize data
+        center_list = []
+        best_icv = np.inf
+        for i in range(max_init_iter):
+            m, kcc = kmeans.kmeans(X, K, iter=100, **cluster_init_prop)
+            icv = kmeans.find_intra_cluster_variance(X, m, kcc)
+            if best_icv > icv:
+                membership = m
+                cc = kcc
+                best_icv = icv
+        for i in range(cc.shape[0]):
+            center_list.append(cc[i,:])
+    else:
+        raise "Unknown initialization of EM of MoG centers."
+
+    # Initialize co-variance matrices
+    cov_list = []
+    if cov_init=='iso':
+        for i in range(K):
+            cov_list.append(np.diag(np.ones(dim)/1e10))
+            #cov_list.append(np.diag(np.ones(dim)))
+    elif cov_init=='var':
+        for i in range(K):
+            cov_list.append(np.diag(np.var(X, axis=0)/1e10))
+    else:
+        raise ValueError('Unknown option used for cov_init')
+
+    p_k = np.ones(K) / K # Uniform prior on P(k)
+    return (center_list, cov_list, p_k)
+
+
+def em_gm(X, K, max_iter = 50, verbose = False, \
+                iter_call = None,\
+                delta_stop = 1e-6,\
+                init_kw = {}, \
+                max_tries = 10,\
+                diag_add = 1e-3):
+    """Find K cluster centers in X using Expectation Maximization of Gaussian Mixtures.
+   
+    Parameters
+    -----------
+    X : NxD array
+        Input data. Should contain N samples row wise, and D variablescolumn wise.
+    max_iter : int
+        Maximum allowed number of iterations/try.
+    iter_call : callable
+        Called for each iteration: iter_call(center_list, cov_list, p_k, i)
+    delta_stop : float
+        Stop when the change in the mean negative log likelihood goes below this
+        value.
+    max_tries : int
+        The co-variance matrix for some cluster migth end up with NaN values, then
+        the algorithm will restart; max_tries is the number of allowed retries.
+    diag_add : float
+        A scalar multiplied by the variance of each feature of the input data, 
+        and added to the diagonal of the covariance matrix at each iteration.
+
+    Centroid initialization is given by *cluster_init*, the only available options
+    are 'sample' and 'kmeans'. 'sample' selects random samples as centroids. 'kmeans'
+    calls kmeans to find the cluster centers.
+
+    Returns
+    -------
+    center_list : list
+        A K-length list of cluster centers
+    cov_list : list
+        A K-length list of co-variance matrices
+    p_k : list
+        An K length array with mixing cofficients (p_k)
+    logLL : list
+         Log likelihood (how well the data fits the model)
+    """
+
+    samples, dim = np.shape(X)
+    clusters_found = False
+    while clusters_found==False and max_tries>0:
+        max_tries -= 1
+        # Initialized clusters
+        center_list, cov_list, p_k = gmm_init(X, K, **init_kw)
+        # Now perform the EM-steps:
+        try:
+            center_list, cov_list, p_k, logL = \
+                gmm_em_continue(X, center_list, cov_list, p_k,
+                        max_iter=max_iter, verbose=verbose,
+                        iter_call=iter_call,
+                        delta_stop=delta_stop,
+                        diag_add=diag_add)
+            clusters_found = True
+        except Cov_problem:
+            if verbose:
+                print "Problems with the co-variance matrix, tries left ", max_tries
+
+    if clusters_found:
+        return center_list, cov_list, p_k, logL
+    else:
+        raise Cov_problem()
+
+
 def gmm_em_continue(X, center_list, cov_list, p_k,
                     max_iter = 50, verbose = False, \
                     iter_call = None,\
                     delta_stop = 1e-6,\
-                    diag_add = 1e-3):
+                    diag_add = 1e-3,\
+                    delta_stop_count_end=10):
     """
     """
+    delta_stop_count = 0
     samples, dim = np.shape(X)
     K = len(center_list) # We should do some input checking
     if diag_add!=0:
@@ -246,6 +392,11 @@ def gmm_em_continue(X, center_list, cov_list, p_k,
                 print "iteration=", i, " delta log likelihood=", \
                     old_logL - logL
             if np.abs(logL - old_logL) < delta_stop: #* samples:
+                delta_stop_count += 1
+                if verbose: print "gmm_em_continue: delta_stop_count =", delta_stop_count
+            else:
+                delta_stop_count = 0
+            if delta_stop_count>=delta_stop_count_end:
                 break # Sufficient precision reached
         old_logL = logL
     try:
@@ -254,112 +405,6 @@ def gmm_em_continue(X, center_list, cov_list, p_k,
         raise Cov_problem()
     return center_list, cov_list, p_k, logL
 
-
-def em_gm(X, K, max_iter = 50, verbose = False, \
-                cluster_init = 'sample', \
-                cluster_init_prop = None, \
-                iter_call = None,\
-                delta_stop = 1e-6,\
-                max_tries = 10,\
-                diag_add = 1e-3,\
-                max_init_iter = 1, \
-                cov_init = 'iso'):
-    """Find K cluster centers in X using Expectation Maximization of Gaussian Mixtures.
-   
-    Parameters
-    -----------
-    X : NxD array
-        Input data. Should contain N samples row wise, and D variablescolumn wise.
-    max_iter : int
-        Maximum allowed number of iterations/try.
-    cluster_init : string
-        How to initalize centroids: 'sample' or 'kmeans'
-    cluster_init_prop : dict
-        Passed to the kmeans (if used) as keyword arguments
-    iter_call : callable
-        Called for each iteration: iter_call(center_list, cov_list, p_k, i)
-    delta_stop : float
-        Stop when the change in the mean negative log likelihood goes below this
-        value.
-    max_tries : int
-        The co-variance matrix for some cluster migth end up with NaN values, then
-        the algorithm will restart; max_tries is the number of allowed retries.
-    diag_add : float
-        A scalar multiplied by the variance of each feature of the input data, 
-        and added to the diagonal of the covariance matrix at each iteration.
-
-    Centroid initialization is given by *cluster_init*, the only available options
-    are 'sample' and 'kmeans'. 'sample' selects random samples as centroids. 'kmeans'
-    calls kmeans to find the cluster centers.
-
-    Returns
-    -------
-    center_list : list
-        A K-length list of cluster centers
-    cov_list : list
-        A K-length list of co-variance matrices
-    p_k : list
-        An K length array with mixing cofficients (p_k)
-    logLL : list
-         Log likelihood (how well the data fits the model)
-    """
-
-    samples, dim = np.shape(X)
-
-    clusters_found = False
-    while clusters_found==False and max_tries>0:
-        max_tries -= 1
-        # Initialize the centroids
-        if cluster_init == 'sample':
-            center_list = []
-            for i in range(K):
-                center_list.append(X[np.random.randint(samples), :])
-        elif cluster_init == 'kmeans':
-            center_list = []
-            best_icv = np.inf
-            for i in range(max_init_iter):
-                m, kcc = kmeans.kmeans(X, K, iter=100, **cluster_init_prop)
-                icv = kmeans.find_intra_cluster_variance(X, m, kcc)
-                if best_icv > icv:
-                    print "New start centers: ", best_icv, icv
-                    membership = m
-                    cc = kcc
-                    best_icv = icv
-            for i in range(cc.shape[0]):
-                center_list.append(cc[i,:])
-        else:
-            raise "Unknown initialization of EM of MoG centers."
-
-        # Initialize co-variance matrices
-        cov_list = []
-        if cov_init=='iso':
-            for i in range(K):
-                cov_list.append(np.diag(np.ones(dim)/1e10))
-                #cov_list.append(np.diag(np.ones(dim)))
-        elif cov_init=='var':
-            for i in range(K):
-                cov_list.append(np.diag(np.var(X, axis=0)/1e10))
-        else:
-            raise ValueError('Unknown option used for cov_init')
-
-        p_k = np.ones(K) / K # Uniform prior on P(k)
-        # Now perform the EM-steps:
-
-        try:
-            center_list, cov_list, p_k, logL = gmm_em_continue(X, center_list, cov_list, p_k,
-                        max_iter = max_iter, verbose=verbose,
-                        iter_call=iter_call,
-                        delta_stop=delta_stop,
-                        diag_add=diag_add)
-            clusters_found = True
-        except Cov_problem:
-            if verbose:
-                print "Problems with the co-variance matrix, tries left ", max_tries
-
-    if clusters_found:
-        return center_list, cov_list, p_k, logL
-    else:
-        raise Cov_problem()
 
 def __em_gm_step(X, center_list, cov_list, p_k, K, diag_add_vec):
     samples = X.shape[0]
