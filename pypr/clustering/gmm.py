@@ -6,7 +6,9 @@ import numpy as np
 import numpy.linalg as linalg
 import kmeans
 import copy
+import types
 from copy import deepcopy
+import gauss_diff
 
 def mulnormpdf(X, MU, SIGMA):
     """Evaluates the PDF for the multivariate Guassian distribution.
@@ -109,6 +111,8 @@ def gmm_pdf(X, centroids, ccov, mc, individual=False):
     mc : list
         Mixing cofficients for each cluster (must sum to one)
                   by default equal for each cluster.
+    individual : bool
+        If True the probability density is returned for each cluster component.
 
     Returns
     -------
@@ -511,18 +515,24 @@ class Cov_problem(Exception):
 def cond_dist(Y, centroids, ccov, mc):
     """Finds the conditional distribution p(X|Y) for a GMM.
 
-    Y         : An array of inputs. Inputs set to NaN are not set, and
-                become inputs to the resulting distribution. Order is
-                preserved.
-    centroids : List of cluster centers - [ [x1,y1,..],..,[xN, yN,..] ]
-    ccov      : List of cluster co-variances DxD matrices
-    mc        : Mixing cofficients for each cluster (must sum to one)
-                  by default equal for each cluster.
+    Parameters
+    ----------
+    Y : NxD array
+        An array of inputs. Inputs set to NaN are not set, and become inputs to
+        the resulting distribution. Order is preserved.
+    centroids : list
+        List of cluster centers - [ [x1,y1,..],..,[xN, yN,..] ]
+    ccov : list
+        List of cluster co-variances DxD matrices
+    mc : list
+        Mixing cofficients for each cluster (must sum to one) by default equal
+        for each cluster.
 
-    Example:    
-    
-    Returns: A tuple containing a new set of (centroids, ccov, mc)
-             for the conditional distribution.
+    Returns
+    -------
+    res : tuple
+        A tuple containing a new set of (centroids, ccov, mc) for the
+        conditional distribution.
     """
     not_set_idx = np.nonzero(np.isnan(Y))[0]
     set_idx = np.nonzero(True - np.isnan(Y))[0]
@@ -558,13 +568,23 @@ def cond_dist(Y, centroids, ccov, mc):
 def marg_dist(X_idx, centroids, ccov, mc):
     """Finds the marginal distribution p(X) for a GMM.
 
-    X_idx     : 
-    centroids : List of cluster centers - [ [x1,y1,..],..,[xN, yN,..] ]
-    ccov      : List of cluster co-variances DxD matrices
-    mc        : Mixing cofficients for each cluster (must sum to one)
-                  by default equal for each cluster.
-    Returns: A tuple containing a new set of (centroids, ccov, mc)
-             for the conditional distribution.
+    Parameters
+    ----------
+    X_idx : list
+        Index of dimensions to keep
+    centroids : list
+        List of cluster centers - [ [x1,y1,..],..,[xN, yN,..] ]
+    ccov : list
+        List of cluster co-variances DxD matrices
+    mc : list
+        Mixing cofficients for each cluster (must sum to one) by default equal
+        for each cluster.
+
+    Returns
+    -------
+    res : tuple
+        A tuple containing a new set of (centroids, ccov, mc) for the
+        marginal distribution.
     """
     new_cen = []
     new_cov = []
@@ -574,5 +594,47 @@ def marg_dist(X_idx, centroids, ccov, mc):
     new_mc = mc
     return (new_cen, new_cov, new_mc)
 
-gmm_find = em_gm
+def find_density_diff(center_list, cov_list, p_k=None, method='hellinger'):
+    """Difference measures for each component of the GMM.
+
+    Parameters
+    ----------
+    centroids : list
+        List of cluster centers - [ [x1,y1,..],..,[xN, yN,..] ]
+    ccov : list
+        List of cluster co-variances DxD matrices
+    p_k : list
+        Mixing cofficients for each cluster (must sum to one) by default equal
+        for each cluster.
+    method : string, optional
+        Select difference measure to use. Can be 'hellinger' or 'hellinger_weighted'.
+
+    Returns
+    -------
+    diff : NxN np array
+        The difference between the probability distribtions of the components
+        pairwise. Only the upper triangular matrix is used.
+    """
+    N = len(center_list)
+    if method=='hellinger':
+        m = gauss_diff.hellinger
+    elif method=='hellinger_weighted':
+        m = gauss_diff.hellinger_weighted
+    elif isinstance(method, types.FunctionType):
+        pass
+    else:
+        raise ValueError('Could not understand method option: '+str(method))
+    diff = np.zeros((N, N))
+    for i in range(N):
+        for j in range(i, N):
+            if method!='hellinger_weighted':
+                dist = m(center_list[i], cov_list[i],\
+                        center_list[j], cov_list[j])
+            else:
+                dist = m(center_list[i], cov_list[i], p_k[i],\
+                        center_list[j], cov_list[j], p_k[j])
+            diff[i, j] = dist
+    return diff
+
+em = em_gm
 
