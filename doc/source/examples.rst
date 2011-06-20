@@ -2,7 +2,6 @@
 More Examples
 =============
 
-
 Tapped Delay Neural Network - Sunspot example
 ---------------------------------------------
 
@@ -35,6 +34,12 @@ And a plot with the sample autocorrelation of the fitted models residuals.
 
 .. [imm02457] 02457 Nonlinear Signal Processing, http://cogsys.imm.dtu.dk/teaching/04364/04364prac.html
 
+
+
+Gaussian Mixture Model Regression (GMR) - Sunspot example
+---------------------------------------------------------
+
+.. literalinclude:: ../../examples/sunspots/sunspots_gmm.py
 
 
 .. _bicexample:

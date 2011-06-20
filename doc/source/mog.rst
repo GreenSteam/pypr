@@ -8,7 +8,7 @@ Gaussian distribution into muliple dimensions.
      \mathcal{N}(\mathbf{x}|\mathbf{\boldsymbol\mu}, \mathbf{\Sigma}) =
     \frac{1}{(2 \pi)^{D/2}}
     \frac{1}{ | \mathbf{\Sigma} |^{1/2} }
-    exp \{ -\frac{1}{2} (\mathbf{\mathbf{x}}-\mathbf{\boldsymbol\mu)}^T \mathbf{\Sigma}^{-1} (\mathbf{\mathbf{x}}-\mathbf{\boldsymbol\mu)} \}
+    \exp \{ -\frac{1}{2} (\mathbf{\mathbf{x}}-\mathbf{\boldsymbol\mu)}^T \mathbf{\Sigma}^{-1} (\mathbf{\mathbf{x}}-\mathbf{\boldsymbol\mu)} \}
 
 The distribution is given by its mean, :math:`\mathbf{\boldsymbol\mu}`, and covariance, :math:`\mathbf{\Sigma}`, matrices.
 To generate samples from the multivariate normal distribution under python, one could use the 
@@ -71,8 +71,8 @@ In the previous example we saw how we could draw samples from a Gaussian Mixture
 Now we will look at how we can work in the opposite direction, given a set of samples find a set of K multivariate Gaussian
 distributions that represent observed samples in a good way.
 The number of clusters, :math:`K`, is given, so the parameters that are to be found are the means and covariances of the distributions.
-The Expectation Maximization (EM) algorithm will be used to find these parameters 
 
+An acknowledged and efficient method for finding the parameters of a GMM is to use Expectation Maximization (EM).
 The EM algorithm is an iterative refinement algorithm used for finding maximum likelihood estimates of parameters in probabilistic models.
 The likelihood is a measure for how good the data fits a given model, and is a function of the parameters of the statistical model.
 If we assume that all the samples in the dataset are independent, then we can write the likelihood as,
@@ -95,7 +95,7 @@ A *responsibility matrix* :math:`\mathbf{R}` with elements :math:`p_{nk}` is use
     = \frac{\mathcal{N} (\mathbf{x}_n | \boldsymbol\mu_k, \mathbf{\Sigma}_k) p(k)}{p(\mathbf{x}_n)}
 
 Given the data and the model parameters :math:`\boldsymbol\mu_k`, :math:`\boldsymbol\Sigma_k`, and :math:`p(k)`, we now can calculate the likeliness :math:`\mathcal{L}` and the probabilities :math:`p_{nk}`.
-This this is the expectation (E) step in EM-algorithm.
+This is the expectation (E) step in EM-algorithm.
 
 In the maximization (M) step we estimate the mean, co-variances, and mixing coefficients :math:`p(k)`.
 As each point has a probability of belonging to a cluster, :math:`p_{nk}`, we have to weight each sample's contribution to the paramter with that factor. The following equations are used to estimate the new set of model parameters.
@@ -111,47 +111,72 @@ As each point has a probability of belonging to a cluster, :math:`p_{nk}`, we ha
 .. math::
     \hat{p}(k) = \frac{1}{N}\sum_n p_{nk}
 
-The function :func:`pypr.clustering.gmm.gmm_find` (earlier called *em_gm*) is used to called to initialise and find the GMM.
+The function :func:`pypr.clustering.gmm.em` is used to called to initialise and find the GMM.
 It will retry *max_tries* times if it encounters problems with the covariance matrix.
 The methods calls :func:`pypr.clustering.gmm_init` to initalized the clusters, and the keyword arguments passed to this can be specified using ``init_kw`` parameter.
 
 
 It can be problematic to initalize the EM algorithm with the ``box`` initalization, as it might be numerically challenging calculating the log likelihood in the first step. Initalizing the EM algorithm with with either ``sample`` or ``kmeans`` should not pose any problems.
 
-If you examine the code for the used to perform the EM algorithm on the mixture of gaussians, *em_gm*, you can see that the code uses the log-sum-exp formula \cite{numericalrecipes} to avoid underflow in the floating point calculations.
+If you examine the code for the GMM EM algorithm, :func:`pypr.clustering.gmm.em`, you can see that the code uses the log-sum-exp formula \cite{numericalrecipes} to avoid underflow in the floating point calculations.
 
-Gaussian Mixtures Regression
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Let :math:`\mathbf{x}` and :math:`\mathbf{x}` be jointly Gaussian vectors see appendix A in [bishop2006]_.
 
-.. math::
-    \left [ \begin{array}{c} \mathbf{x} \\ \mathbf{y} \end{array} \right ] \sim
-    \mathcal{N} \left (
-    \left [ \begin{array}{c} \mathbf{{\mu}}_x \\ \mathbf{{\mu}}_y \end{array} \right ],
-    \left [ \begin{array}{cc} A & C \\ C^T & B \end{array} \right ],   
-    \right )
+Condtional and marginal distributions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-then the conditional distribution of $\mathbf{x}$ given $\mathbf{y}$ can be written as 
+The conditional and marginal distributions can be easily derived from the joint probability described by the GMM, see [bishop2006]_, [rasmussen2006]_, [sung2004]_.
+Let :math:`\mathbf{x}_A` and :math:`\mathbf{x}_B` be jointly Gaussian vectors, and given a GMM with the Guassian distributions :math:`\mathcal{N}(\mathbf{x}|\boldsymbol{\mathbf{\mu}_k},\mathbf{\Sigma}_k)` with :math:`\mathbf{\Lambda}_k =\mathbf{\Sigma}_k^{-1}`
 
 .. math::
-    \mathbf{x} | \mathbf{y} \sim
-    \mathcal{N} \left ( \mathbf{{\mu}}_x + CB^{-1}(\mathbf{y}-\mathbf{\mu_{y}}), A-CB^{-1}C^T) \right )
+    \mathbf{x} = \left(
+      \begin{array}{c} \mathbf{x}_{A} \\ \mathbf{x}_{B} \end{array}
+    \right) , \qquad
+    \boldsymbol{\mu}_{k} = \left(
+      \begin{array}{c} \boldsymbol{\mu}_{kA} \\ \boldsymbol{\mu}_{kB} \end{array}
+    \right)
 
-It is also possible to use a mixture of gaussians for regression. 
-The plot in figure \ref{fig:em_gm_cond} show the conditional distribution of $\mathbf{x}$ given $\mathbf{x}$ = 0.
+.. math::
+    \mathbf{\Sigma}_{k} = \left(
+      \begin{array}{c c} \mathbf{\Sigma}_{kAA} & \mathbf{\Sigma}_{kAB}\\ \mathbf{\Sigma}_{kBA} & \mathbf{\Sigma}_{kBB} \end{array}
+    \right) , \qquad
+    \mathbf{\Lambda}_{k} = \left(
+      \begin{array}{c c} \mathbf{\Lambda}_{kAA} & \mathbf{\Lambda}_{kAB} \\ \mathbf{\Lambda}_{kBA} & \mathbf{\Lambda}_{kBB} \end{array}
+    \right) 
 
-\begin{figure}[htb]
-\begin{center}
-\includegraphics[width=9cm]{figures/em_gm_cond}
-\end{center}
-\caption{The conditional distribution, red line, of $\mathbf{x}$ given $\mathbf{y}$ = 0.}
-\label{fig:em_gm_cond}
-\end{figure}
+Then the marginal distribution can be written as
 
-Example
-^^^^^^^
-This example uses EM to find the the parameters for the Gaussian Mixture Model (GMM), and then plots the conditional
+.. math::
+    p_k(\mathbf{x}_A) = \int p_k(\mathbf{x}) d\mathbf{x}_B = \mathcal{N}(\mathbf{x}_A|\boldsymbol{\mu}_{kA}, \mathbf{\Sigma}_{kAA})
+
+and the conditional distribution for each Gaussian component :math:`k` is given by
+
+.. math::
+    p_k(\mathbf{x}_A | \mathbf{x}_B) = 
+    \frac{p_k(\mathbf{x}_A, \mathbf{x}_B)}{p_k(\mathbf{x}_B)} =
+    \mathcal{N}(\mathbf{x}|\boldsymbol{\mu}_{kA|B}, {\mathbf{\Lambda}_{kAA}}^{-1})
+
+.. math::
+    \boldsymbol{\mu}_{kA|B} = \boldsymbol{\mu}_{kA} - \mathbf{\Lambda}_{kAA}^{-1}  \mathbf{\Lambda}_{kAB}  (\mathbf{x}_B - \boldsymbol{\mu}_{kB})
+
+and for the whole GMM as
+
+.. math::
+    p(\mathbf{x}_A | \mathbf{x}_B) = \sum_{k=1}^{K} \pi'_k p_k(\mathbf{x}_A | \mathbf{x}_B), \quad
+    \pi'_k = 
+    \frac{\pi_k \mathcal{N}(\mathbf{x}_B|\boldsymbol{\mu}_{kB},\mathbf{\Sigma}_{kBB})}
+    {\sum_k \mathcal{N}(\mathbf{x}_B|\boldsymbol{\mu}_{kB},\mathbf{\Sigma}_{kBB})}
+
+It is also possible to use a mixture of gaussians for regression.
+This is done by using the conditional distribution, so that we have :math:`p(output|inputs)`.
+When using the GMM for regression, the model output can be calculated as the expected value of the conditional GMM probability density function
+
+.. math::
+    \langle \mathbf{x}_A \rangle = \sum_k \pi_k' \boldsymbol{\mu}_{kA|B}
+
+
+
+Here is an example which uses EM to find the the parameters for the Gaussian Mixture Model (GMM), and then plots the conditional
 distribution for one of the parameters.
 
 .. literalinclude:: ../../examples/em_gm.py
@@ -159,6 +184,9 @@ distribution for one of the parameters.
 The resulting plot should look something similar to this:
 
 .. image:: figures/em_gm_cond_dist.png
+
+.. [sung2004] Gaussian Mixture Regression and Classi\ufb01cation, H. G. Sung, Rice University (2004)
+.. [rasmussen2006] Gaussian Processes for Machine Learning, Carl Edward Rasmussen and Christopher K. I. Williams, MIT Press (2006)
 
 
 Application Programming Interface

@@ -607,7 +607,11 @@ def find_density_diff(center_list, cov_list, p_k=None, method='hellinger'):
         Mixing cofficients for each cluster (must sum to one) by default equal
         for each cluster.
     method : string, optional
-        Select difference measure to use. Can be 'hellinger' or 'hellinger_weighted'.
+        Select difference measure to use. Can be:
+
+        - 'hellinger' :
+        - 'hellinger_weighted' :
+        - 'KL' : Kullback-Leibler divergence
 
     Returns
     -------
@@ -620,6 +624,8 @@ def find_density_diff(center_list, cov_list, p_k=None, method='hellinger'):
         m = gauss_diff.hellinger
     elif method=='hellinger_weighted':
         m = gauss_diff.hellinger_weighted
+    elif method=='KL':
+        m = gauss_diff.KL
     elif isinstance(method, types.FunctionType):
         pass
     else:

@@ -82,5 +82,6 @@ def hellinger_weighted(mu1, sigma1, pi1, mu2, sigma2, pi2):
     X0 = np.zeros(mu1.shape)
     i = 2 * (sigma1norm**(1.0/4)) * (sigma2norm**(1.0/4)) * np.sqrt(2*np.pi) *\
         gmm.mulnormpdf(X0, mu1-mu2, 2*sigma1 + 2*sigma2)
-    return np.sqrt(pi1*pi2) * (1-2*i)
+    #return np.sqrt(pi1*pi2) * (1-2*i)
+    return 1-i[0]
 
