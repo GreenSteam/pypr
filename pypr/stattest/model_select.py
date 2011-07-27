@@ -40,6 +40,6 @@ def bic_gmm(logL, N, D, K):
         BIC score.
     """
     M = (K-1) + K*(D+0.5*D*(D+1))
-    bic_score = stattest.bic(logL, M, N)
+    bic_score = bic(logL, M, N)
     return bic_score
 
