@@ -9,6 +9,7 @@ import copy
 import types
 from copy import deepcopy
 import gauss_diff
+import pypr.preprocessing as preproc
 
 def mulnormpdf(X, MU, SIGMA):
     """Evaluates the PDF for the multivariate Guassian distribution.
@@ -259,18 +260,22 @@ def gmm_init(X, K, verbose = False,
             center_list.append(init_point.flatten())            
     elif cluster_init == 'kmeans':
         if verbose: print "Using K-means GMM initalization."
-        # TODO: Normalize data
+        # Normalize data (K-means is isotropic)
+        normalizerX = preproc.Normalizer(X)
+        nX = normalizerX.transform(X)
         center_list = []
         best_icv = np.inf
         for i in range(max_init_iter):
-            m, kcc = kmeans.kmeans(X, K, iter=100, **cluster_init_prop)
+            m, kcc = kmeans.kmeans(nX, K, iter=100, **cluster_init_prop)
             icv = kmeans.find_intra_cluster_variance(X, m, kcc)
             if best_icv > icv:
                 membership = m
                 cc = kcc
                 best_icv = icv
+        cc = normalizerX.invtransform(cc)
         for i in range(cc.shape[0]):
             center_list.append(cc[i,:])
+        print cc
     else:
         raise "Unknown initialization of EM of MoG centers."
 
@@ -373,7 +378,7 @@ def gmm_em_continue(X, center_list, cov_list, p_k,
         diag_add_vec = diag_add * feature_var
     old_logL = np.NaN
     logL = np.NaN
-    for i in range(max_iter):
+    for i in xrange(max_iter):
         try:
 ##                    if diag_add != 0:
 ##                        for c in cov_list:
@@ -571,7 +576,7 @@ def marg_dist(X_idx, centroids, ccov, mc):
     Parameters
     ----------
     X_idx : list
-        Index of dimensions to keep
+        Indecies of dimensions to keep
     centroids : list
         List of cluster centers - [ [x1,y1,..],..,[xN, yN,..] ]
     ccov : list
@@ -641,6 +646,36 @@ def find_density_diff(center_list, cov_list, p_k=None, method='hellinger'):
                         center_list[j], cov_list[j], p_k[j])
             diff[i, j] = dist
     return diff
+
+def predict(X, centroids, ccov, mc):
+    """Predict the entries in X, which contains NaNs.
+
+    Parameters
+    ----------
+    X : np array
+        2d np array containing the inputs. Target are specified with numpy NaNs.
+        The NaNs will be replaced with the most probable result according to the
+        GMM model provided.
+    centroids : list
+        List of cluster centers - [ [x1,y1,..],..,[xN, yN,..] ]
+    ccov : list
+        List of cluster co-variances DxD matrices
+    mc : list
+        Mixing cofficients for each cluster (must sum to one) by default equal
+        for each cluster.
+
+    Returns
+    -------
+    Nothing - X is modified
+    """
+    samples, D = X.shape
+    for i in range(samples):
+        row = X[i, :]
+        targets = np.isnan(row)
+        cen_cond, cov_cond, mc_cond = cond_dist(row, centroids, ccov, mc)
+        X[i, targets] = np.zeros(np.sum(targets))
+        for j in range(len(cen_cond)):
+            X[i,targets] = X[i,targets] + (cen_cond[j]*mc_cond[j])
 
 em = em_gm
 
