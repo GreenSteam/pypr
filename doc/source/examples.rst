@@ -52,6 +52,12 @@ Finding the Number of Clusters to use in a Gaussian Mixture Model
 .. image:: figures/bic.*
 
 
+Simple GP demo
+--------------
+In the examples folder you can find a program called 'gp_hyperparameters_demo.py' where the effects of the GP's hyperparameters are illustrated.
+
+.. image:: figures/gp_example.*
+
 
 .. _iris_example:
 

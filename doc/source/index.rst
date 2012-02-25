@@ -13,7 +13,8 @@ However many of the methods used can be used in a wide range of application, and
 The Ph. D. project was funded by "Føroyagrunnurin frá 1971", which is administered by `Faroese Research Counsil <http://www.gransking.fo>`_.
 I am enrolled at `DTU Informatics <http://www.imm.dtu.dk>`_, so the code has been heavily inspired by them, and by the company that I work at, `Decision3 <http://www.decision3.com>`_.
 
-The code is not very mature yet, and it might change considerably over time. If you use parts of this code in your project, you might just want to copy the code or files. Please add a reference to this project :)
+The code is still under constant development, and it might change considerably over time. If you use parts of this code in your project, you might just want to copy the code or files. Please add a reference to this project :)
+
 
 Contents:
 
