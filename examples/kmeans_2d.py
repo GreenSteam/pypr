@@ -21,3 +21,5 @@ plot(X[m==0, 0], X[m==0, 1], 'r.')
 plot(X[m==1, 0], X[m==1, 1], 'b.')
 plot(X[m==2, 0], X[m==2, 1], 'g.')
 xlabel('$x_1$'); ylabel('$x_2$')
+show()
+
